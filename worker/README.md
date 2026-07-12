@@ -8,7 +8,10 @@ O worker roda no Colab (T4 grátis) e conversa com a API **apenas via Redis**
 Colab (`File → Open notebook → GitHub`), selecione ambiente T4, cadastre os
 secrets abaixo e rode as células em ordem. Ele clona este repositório e importa
 `app.models` / `app.queue` / `app.storage` da Fase 0, então o contrato
-Pydantic e a máquina de estados são exatamente os da API. Além do
+Pydantic e a máquina de estados são exatamente os da API. Cobre
+**text-to-video e image-to-video** (Fase 2): cenas com
+`init_image_asset_id` usam o `LTXImageToVideoPipeline`, que compartilha os
+pesos com o text-to-video — nada extra de download ou VRAM. Além do
 `REDIS_URL`, cadastre também `S3_ENDPOINT_URL`, `S3_ACCESS_KEY`,
 `S3_SECRET_KEY` e `S3_BUCKET` nos Secrets (o MinIO do docker-compose não é
 alcançável do Colab — use Cloudflare R2 ou um MinIO exposto).

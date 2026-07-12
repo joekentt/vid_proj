@@ -37,14 +37,11 @@ from app.config import get_settings
 from app.models import Asset, AssetKind, JobStatus, TERMINAL_STATES
 from app.queue import job_queue
 from app.queue.redis_client import get_redis
-from app.storage import s3_client
+from app.storage import asset_store, s3_client
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 FAKE_WORKER = os.environ.get("E2E_FAKE_WORKER", "1") == "1"
 TIMEOUT = float(os.environ.get("E2E_TIMEOUT", "180" if FAKE_WORKER else "1800"))
-
-# Mesmo prefixo usado pelo worker (worker/colab_worker.ipynb, célula 8).
-ASSET_KEY_PREFIX = "video_jobs:asset:"
 
 PAYLOAD = {
     "title": "E2E Fase 1",
@@ -76,13 +73,11 @@ def _tiny_mp4(path: str) -> None:
 
 
 async def _register_asset(local_path: str, storage_key: str, kind: AssetKind) -> Asset:
-    """Espelha o register_asset do worker: upload + Asset JSON no Redis."""
-    settings = get_settings()
+    """Espelha o register_asset do worker: upload + Asset via asset_store."""
     s3_client.upload_file(local_path, storage_key, "video/mp4")
     asset = Asset(id=uuid.uuid4().hex, kind=kind, storage_key=storage_key,
                   size_bytes=os.path.getsize(local_path))
-    await get_redis().set(ASSET_KEY_PREFIX + asset.id, asset.model_dump_json(),
-                          ex=settings.job_ttl_seconds)
+    await asset_store.save_asset(asset)
     return asset
 
 
@@ -181,11 +176,10 @@ async def test_e2e_fase1():
             "cena sem output_asset_id apesar de DONE")
 
         # --- Etapa 6: asset resolvível e binário no storage ---------------
-        raw = await get_redis().get(ASSET_KEY_PREFIX + data["final_asset_id"])
-        assert raw is not None, (
-            f"Asset {data['final_asset_id']} não registrado em "
-            f"{ASSET_KEY_PREFIX}* no Redis")
-        asset = Asset.model_validate_json(raw)
+        asset = await asset_store.get_asset(data["final_asset_id"])
+        assert asset is not None, (
+            f"Asset {data['final_asset_id']} não registrado no Redis "
+            f"(prefixo {asset_store.ASSET_KEY_PREFIX})")
         s3_client.get_s3().head_object(Bucket=settings.s3_bucket,
                                        Key=asset.storage_key)
         url = s3_client.presigned_url(asset.storage_key)

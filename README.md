@@ -59,6 +59,34 @@ curl http://localhost:8000/jobs/SEU_JOB_ID
 
 O job fica em `pending` até o worker conectar (Fase 1).
 
+### Image-to-video (Fase 2)
+
+Suba a imagem inicial e referencie o asset na cena — o `mode` vira
+`image_to_video` automaticamente:
+
+```bash
+# 1. upload da imagem (ou reuse um asset_id de upload anterior)
+ASSET_ID=$(curl -s -X POST http://localhost:8000/assets/images \
+  -F "file=@minha_foto.png;type=image/png" | python -c \
+  'import json,sys; print(json.load(sys.stdin)["id"])')
+
+# 2. job com imagem inicial + parâmetros
+curl -X POST http://localhost:8000/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title": "Foto ganhando vida",
+    "scenes": [{
+      "id": "s0", "order": 0,
+      "prompt": "A câmera afasta lentamente, nuvens se movem no céu",
+      "init_image_asset_id": "'$ASSET_ID'",
+      "params": {"seed": 42, "negative_prompt": "blurry",
+                 "duration_seconds": 4.0, "fps": 24,
+                 "width": 768, "height": 512,
+                 "init_image_strength": 0.9}
+    }]
+  }'
+```
+
 ### Validação E2E (Fase 1)
 
 `backend/tests/test_e2e_fase1.py` percorre o caminho completo
@@ -115,7 +143,7 @@ o compose já injeta `redis://redis:6379/0` e nada muda.
 
 - [x] **Fase 0** — Esqueleto, contratos, fila, storage
 - [ ] **Fase 1** — MVP vertical: 1 clipe text-to-video ponta a ponta (worker Colab + LTX-Video)
-- [ ] **Fase 2** — Image-to-video + parâmetros avançados
+- [x] **Fase 2** — Image-to-video + parâmetros avançados
 - [ ] **Fase 3** — Scene chaining (concatenação FFmpeg, consistência de personagem)
 - [ ] **Fase 4** — Áudio: TTS, lip-sync, música, mixagem
 - [ ] **Fase 5** — Pós-processamento: upscaling, interpolação, export

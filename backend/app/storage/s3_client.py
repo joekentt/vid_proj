@@ -49,6 +49,24 @@ def upload_file(local_path: str, storage_key: str, content_type: str) -> None:
     )
 
 
+def upload_bytes(data: bytes, storage_key: str, content_type: str) -> None:
+    """Sobe um payload em memória (ex.: upload de imagem vindo da API)."""
+    s = get_settings()
+    get_s3().put_object(
+        Bucket=s.s3_bucket,
+        Key=storage_key,
+        Body=data,
+        ContentType=content_type,
+    )
+
+
+def download_bytes(storage_key: str) -> bytes:
+    """Baixa um objeto inteiro para memória (imagens iniciais são pequenas)."""
+    s = get_settings()
+    obj = get_s3().get_object(Bucket=s.s3_bucket, Key=storage_key)
+    return obj["Body"].read()
+
+
 def presigned_url(storage_key: str) -> str:
     """Gera URL temporária de download para o frontend."""
     s = get_settings()
