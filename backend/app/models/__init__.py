@@ -11,6 +11,14 @@ from .job import (
     JobStatus,
     TERMINAL_STATES,
 )
+from .project import (
+    Project,
+    ProjectCreateRequest,
+    ProjectRender,
+    RENDER_TERMINAL,
+    RenderQuality,
+    RenderStatus,
+)
 from .scene import (
     GenerationMode,
     Scene,
@@ -26,6 +34,12 @@ __all__ = [
     "JobProgress",
     "JobStatus",
     "TERMINAL_STATES",
+    "Project",
+    "ProjectCreateRequest",
+    "ProjectRender",
+    "RENDER_TERMINAL",
+    "RenderQuality",
+    "RenderStatus",
     "GenerationMode",
     "Scene",
     "SceneParams",

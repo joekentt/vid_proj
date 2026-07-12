@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class GenerationMode(str, Enum):
@@ -74,11 +74,24 @@ class Scene(BaseModel):
         description="ID de um Asset de imagem para usar como frame inicial.",
     )
 
-    # Para consistência de personagem entre cenas (Fase 3).
-    reference_image_url: Optional[HttpUrl] = None
+    # Consistência de personagem/estilo (Fase 3). Normalmente definidos no
+    # Project e ESTAMPADOS em cada cena pelo orquestrador ao enfileirar —
+    # o worker só olha para a cena, nunca para o projeto.
+    reference_image_asset_id: Optional[str] = Field(
+        default=None,
+        description="Asset de imagem com o personagem/estilo de referência.",
+    )
+    consistency_method: str = Field(
+        default="none",
+        description="Método do registry (ex.: 'ip_adapter_keyframe').",
+    )
 
     params: SceneParams = Field(default_factory=SceneParams)
     transition_to_next: TransitionType = TransitionType.CUT
+    transition_duration_seconds: float = Field(
+        default=0.6, ge=0.1, le=2.0,
+        description="Duração de fade/dissolve para a próxima cena (cut ignora).",
+    )
 
     # Preenchido pelo worker quando o clipe fica pronto.
     output_asset_id: Optional[str] = None

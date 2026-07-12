@@ -87,6 +87,37 @@ curl -X POST http://localhost:8000/jobs \
   }'
 ```
 
+### Projetos multi-cena (Fase 3)
+
+Um **Project** agrupa cenas ordenadas que viram um único vídeo, com
+transições (`cut`/`fade`/`dissolve`) e consistência de personagem via
+imagem de referência (IP-Adapter no keyframe — veja
+`GET /registry/consistency-methods` e `backend/app/registry.py`):
+
+```bash
+curl -X POST http://localhost:8000/projects -H 'Content-Type: application/json' -d '{
+  "title": "Curta",
+  "reference_image_asset_id": "'$REF_ID'",
+  "consistency_method": "ip_adapter_keyframe",
+  "scenes": [
+    {"id": "s0", "order": 0, "prompt": "Herói na floresta",
+     "transition_to_next": "fade", "transition_duration_seconds": 0.6},
+    {"id": "s1", "order": 1, "prompt": "Herói no lago",
+     "transition_to_next": "dissolve"},
+    {"id": "s2", "order": 2, "prompt": "Close no herói"}
+  ]
+}'
+curl -X POST http://localhost:8000/projects/$PID/render -d '{"quality": "final"}' \
+  -H 'Content-Type: application/json'      # 1 job por cena + orquestração
+curl http://localhost:8000/projects/$PID   # current_render: rendering -> compositing -> done
+curl http://localhost:8000/projects/$PID/storyboard  # grade p/ revisão (antes ou depois)
+```
+
+O render enfileira cada cena como um job independente; um finalizador na API
+acompanha os estados no Redis e, quando todas concluem, concatena com FFmpeg
+aplicando as transições. `quality: "preview"` corta passos e resolução pela
+metade para uma prévia rápida.
+
 ### Validação E2E (Fase 1)
 
 `backend/tests/test_e2e_fase1.py` percorre o caminho completo
@@ -144,7 +175,7 @@ o compose já injeta `redis://redis:6379/0` e nada muda.
 - [x] **Fase 0** — Esqueleto, contratos, fila, storage
 - [ ] **Fase 1** — MVP vertical: 1 clipe text-to-video ponta a ponta (worker Colab + LTX-Video)
 - [x] **Fase 2** — Image-to-video + parâmetros avançados
-- [ ] **Fase 3** — Scene chaining (concatenação FFmpeg, consistência de personagem)
+- [x] **Fase 3** — Scene chaining (concatenação FFmpeg, consistência de personagem)
 - [ ] **Fase 4** — Áudio: TTS, lip-sync, música, mixagem
 - [ ] **Fase 5** — Pós-processamento: upscaling, interpolação, export
 - [ ] **Fase 6** — Editor de timeline, galeria, auth, créditos

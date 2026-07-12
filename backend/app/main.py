@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import routes_assets, routes_jobs
+from app.api import routes_assets, routes_jobs, routes_projects, routes_registry
 from app.config import get_settings
 from app.queue.redis_client import close_redis
 from app.storage.s3_client import ensure_bucket
@@ -42,6 +42,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(routes_jobs.router)
     app.include_router(routes_assets.router)
+    app.include_router(routes_projects.router)
+    app.include_router(routes_registry.router)
 
     @app.get("/health", tags=["meta"])
     async def health():
