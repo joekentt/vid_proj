@@ -59,6 +59,26 @@ curl http://localhost:8000/jobs/SEU_JOB_ID
 
 O job fica em `pending` até o worker conectar (Fase 1).
 
+### Validação E2E (Fase 1)
+
+`backend/tests/test_e2e_fase1.py` percorre o caminho completo
+(POST → Redis → worker → storage → GET) e imprime cada etapa:
+
+```bash
+docker compose up -d redis minio
+cd backend && pip install -e '.[dev]'
+uvicorn app.main:app &          # ou: docker compose up api
+
+pytest tests/test_e2e_fase1.py -s                      # worker fake embutido
+E2E_FAKE_WORKER=0 E2E_TIMEOUT=1800 \
+  pytest tests/test_e2e_fase1.py -s                    # worker real no Colab
+```
+
+No modo fake o teste consome a fila com o mesmo código do worker
+(`claim`/`mark_done`), gerando um MP4 mínimo no lugar do LTX-Video — valida o
+contrato inteiro sem GPU. No modo real, aponte o `REDIS_URL` do Colab e da API
+para o mesmo Upstash e deixe o notebook rodando antes do pytest.
+
 ## Configuração
 
 Tudo via `.env` (copie `backend/.env.example` para `backend/.env`; veja
