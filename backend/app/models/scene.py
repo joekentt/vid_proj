@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
 class GenerationMode(str, Enum):
@@ -49,6 +49,14 @@ class SceneParams(BaseModel):
         default=40, ge=10, le=100,
         description="Passos de denoising. Mais = melhor qualidade, mais lento.",
     )
+    init_image_strength: float = Field(
+        default=0.9, ge=0.0, le=1.0,
+        description=(
+            "Só para image-to-video: quanto a imagem inicial 'segura' o vídeo. "
+            "1.0 = primeiro frame idêntico à imagem; valores menores dão mais "
+            "liberdade ao modelo."
+        ),
+    )
 
 
 class Scene(BaseModel):
@@ -58,8 +66,13 @@ class Scene(BaseModel):
     mode: GenerationMode = GenerationMode.TEXT_TO_VIDEO
     prompt: str = Field(min_length=1, max_length=2000)
 
-    # Para image-to-video (Fase 2): URL da imagem inicial já no storage.
-    init_image_url: Optional[HttpUrl] = None
+    # Para image-to-video (Fase 2): Asset (kind=image) já no storage.
+    # A API valida existência e tipo na criação do job; o worker baixa
+    # a imagem pelo storage_key do Asset.
+    init_image_asset_id: Optional[str] = Field(
+        default=None,
+        description="ID de um Asset de imagem para usar como frame inicial.",
+    )
 
     # Para consistência de personagem entre cenas (Fase 3).
     reference_image_url: Optional[HttpUrl] = None
@@ -69,3 +82,20 @@ class Scene(BaseModel):
 
     # Preenchido pelo worker quando o clipe fica pronto.
     output_asset_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _sync_mode_with_init_image(self) -> "Scene":
+        """Mantém `mode` coerente com a presença da imagem inicial.
+
+        Enviar só o init_image_asset_id já basta: o modo vira
+        IMAGE_TO_VIDEO automaticamente. Pedir IMAGE_TO_VIDEO sem imagem
+        é erro de contrato e falha na validação (422 na API).
+        """
+        if self.init_image_asset_id and self.mode == GenerationMode.TEXT_TO_VIDEO:
+            self.mode = GenerationMode.IMAGE_TO_VIDEO
+        if self.mode == GenerationMode.IMAGE_TO_VIDEO and not self.init_image_asset_id:
+            raise ValueError(
+                "cena image_to_video exige init_image_asset_id "
+                "(faça upload em POST /assets/images e use o id retornado)"
+            )
+        return self

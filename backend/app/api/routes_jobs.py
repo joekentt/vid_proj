@@ -10,15 +10,43 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 
-from app.models import Job, JobCreateRequest, JobStatus
+from app.models import AssetKind, Job, JobCreateRequest, JobStatus, Scene
 from app.queue import job_queue
+from app.storage import asset_store
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+async def _validate_init_image(scene: Scene) -> None:
+    """Garante que o init_image_asset_id aponta para um Asset de imagem vivo.
+
+    Validação com IO fica aqui (o validator do Pydantic cuida só da coerência
+    interna da cena). Falhar na criação é barato; falhar no worker desperdiça
+    tempo de GPU.
+    """
+    if scene.init_image_asset_id is None:
+        return
+    asset = await asset_store.get_asset(scene.init_image_asset_id)
+    if asset is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"cena '{scene.id}': init_image_asset_id "
+                   f"'{scene.init_image_asset_id}' não existe ou expirou — "
+                   "faça upload em POST /assets/images",
+        )
+    if asset.kind != AssetKind.IMAGE:
+        raise HTTPException(
+            status_code=422,
+            detail=f"cena '{scene.id}': asset '{asset.id}' é "
+                   f"'{asset.kind.value}', esperado 'image'",
+        )
 
 
 @router.post("", response_model=Job, status_code=201)
 async def create_job(req: JobCreateRequest) -> Job:
     """Cria um job a partir das cenas e o coloca na fila."""
+    for scene in req.scenes:
+        await _validate_init_image(scene)
     job_id = uuid.uuid4().hex
     # Reordena as cenas pelo campo `order` para garantir consistência.
     scenes = sorted(req.scenes, key=lambda s: s.order)
